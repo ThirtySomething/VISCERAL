@@ -13,6 +13,7 @@ Afer some analysis I figured out that the
 C:\Users\Account Name\AppData\Roaming\Code\User\workspaceStorage
 </code>
 
+
 directory contains nearly almost all data. A quick search on the internet
 shows that this is a common problem:
 
