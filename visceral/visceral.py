@@ -36,60 +36,108 @@ class Visceral:
     - Delete workspace if folder does not exist
     '''
 
-    file_prefix = 'file:///'
+    file_prefix = 'file:'
+    local_path_prefix = '///'
+    network_path_prefix = '//'
     folder_key = 'folder'
     workspace_file = 'workspace.json'
+    workspace_location = '\\Code\\User\\workspaceStorage'
 
-    def __init__(self, workspace):
+    def __init__(self, dryrun=True):
         '''
         Memorize workspace in class variable
         '''
-        self.workspace = workspace
-        logging.debug('workspace [%s]', '{}'.format(workspace))
+        self.workspace = ''.join([os.path.expandvars('${APPDATA}'), Visceral.workspace_location])
+        self.dryrun = dryrun
+        logging.info('workspace [%s]', '{}'.format(self.workspace))
+        logging.info('dryrun [%s]', '{}'.format(self.dryrun))
 
-    def execute(self):
+    def _get_size(self, start_path='.'):
+        '''
+        Calculate size of passed directory
+        See: https://stackoverflow.com/questions/1392413/calculating-a-directorys-size-using-python
+        '''
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(start_path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                # skip if it is symbolic link
+                if not os.path.islink(fp):
+                    total_size += os.path.getsize(fp)
+        return total_size
+
+    def _get_readable_size(self, size_in_bytes):
+        size_in_kb = int(size_in_bytes / 1024)
+        size_in_mb = int(size_in_kb / 1024)
+        return size_in_mb
+
+    def cleanup(self):
         '''
         Cleanup process:
-        - First get list of workspace folders (ws folder)
+        - First get list of workspace folders
         - Check inside each ws folder for file 'workspace.json'
+        - Inside this json file check for entry 'folder'
         '''
         logging.debug('Cleanup workspace [%s]', '{}'.format(self.workspace))
-        list_subfolders_with_paths = [f.path for f in os.scandir(self.workspace) if f.is_dir()]
+        vscode_workspaces = [f.path for f in os.scandir(self.workspace) if f.is_dir()]
         fs_folders = {}
-        for current_subfolder in list_subfolders_with_paths:
+        workspaces_total = 0
+        workspaces_deleted = 0
+        workspaces_size_total = 0
+        for current_subfolder in vscode_workspaces:
+            workspaces_total += 1
             folder = ''
             delete_folder = False
             ws_name = os.path.basename(os.path.normpath(current_subfolder))
             logging.debug('')
-            logging.debug('Check current workspace [%s]', '{}'.format(current_subfolder))
+            logging.debug('Check current workspace [%s]', '{}'.format(ws_name))
             # Join path of current subfolder with workspace file
             wsfile = os.path.join(current_subfolder, Visceral.workspace_file)
+            # File workspace.json not found
             if not path.exists(wsfile):
-                logging.debug('Current workspace [%s] contains no [%s], mark to delete', '{}'.format(ws_name), '{}'.format(Visceral.workspace_file))
-                folder = wsfile
+                logging.debug('File [%s] not found', '{}'.format(Visceral.workspace_file))
+                logging.debug('Manual check of workspace [%s] required', '{}'.format(current_subfolder))
+                continue
+            # File workspace.json found
+            logging.debug('File [%s] found, check for entry [%s]', '{}'.format(Visceral.workspace_file), '{}'.format(Visceral.folder_key))
+            with open(wsfile) as json_file:
+                data = json.load(json_file)
+                # Entry folder not found
+                if Visceral.folder_key not in data:
+                    logging.debug('No entry for [%s] found', '{}'.format(Visceral.folder_key))
+                    logging.debug('Manual check of workspace [%s] required', '{}'.format(current_subfolder))
+                    continue
+                # Entry folder found
+                folder = urllib.parse.unquote(data[Visceral.folder_key])
+                folder = folder.replace(Visceral.file_prefix, '').replace(Visceral.local_path_prefix, '')
+            # Check for network path
+            if folder.startswith(Visceral.network_path_prefix):
+                logging.debug('Folder [%s] is network path', '{}'.format(folder))
+                logging.debug('Manual check of workspace [%s] required', '{}'.format(current_subfolder))
+                continue
+            # Check folder for existence
+            if not path.exists(folder):
+                logging.debug('Folder [%s] does not exist', '{}'.format(folder))
+                logging.debug('Mark [%s] to delete', '{}'.format(current_subfolder))
                 delete_folder = True
-            if not delete_folder:
-                with open(wsfile) as json_file:
-                    data = json.load(json_file)
-                    if Visceral.folder_key not in data:
-                        logging.debug('Current workspace [%s] has no folder location defined [%s] in workspace file [%s], check manual', '{}'.format(ws_name), '{}'.format(data), '{}'.format(Visceral.workspace_file))
-                        continue
-                    folder = urllib.parse.unquote(data[Visceral.folder_key])
-                    folder = folder.replace(Visceral.file_prefix, '')
-            if not delete_folder:
-                if not path.exists(folder):
-                    delete_folder = True
-                    logging.debug('Current workspace [%s] has no corresponding folder [%s], mark to delete', '{}'.format(ws_name), '{}'.format(folder))
+            else:
+                logging.debug('Folder [%s] exist', '{}'.format(folder))
+                if folder not in fs_folders.keys():
+                    logging.debug('Keep [%s]', '{}'.format(current_subfolder))
+                    fs_folders[folder] = current_subfolder
                 else:
-                    logging.debug('Current workspace [%s] has corresponding folder [%s], keep it', '{}'.format(ws_name), '{}'.format(folder))
-                    if folder not in fs_folders.keys():
-                        fs_folders[folder] = current_subfolder
-                    else:
-                        logging.debug('Current [%s] workspace is a duplicate [%s], mark to delete', '{}'.format(ws_name), '{}'.format(folder))
-                        delete_folder = True
+                    logging.debug('Duplicate [%s]', '{}'.format(folder))
+                    logging.debug('Mark [%s] to delete', '{}'.format(current_subfolder))
+                    delete_folder = True
             if delete_folder:
-                shutil.rmtree(current_subfolder, ignore_errors=True)
-                logging.debug('Current workspace [%s] deleted ([%s])', '{}'.format(ws_name), '{}'.format(current_subfolder))
-        logging.debug('')
-        for ws_folder in sorted(fs_folders.keys()):
-            logging.debug('Folder [%s] - [%s]', '{}'.format(ws_folder), '{}'.format(ws_name))
+                workspaces_deleted += 1
+                size = self._get_size(current_subfolder)
+                workspaces_size_total += size
+                logging.debug('Workspace [%s] deleted', '{}'.format(ws_name))
+                logging.debug('Released [%s] Mbytes', '{}'.format(self._get_readable_size(size)))
+                if not self.dryrun:
+                    shutil.rmtree(current_subfolder, ignore_errors=True)
+        logging.info('')
+        logging.info('Workspaces total [%s]', '{}'.format(workspaces_total))
+        logging.info('Workspaces deleted [%s]', '{}'.format(workspaces_deleted))
+        logging.info('Workspaces Mbytes released [%s]', '{}'.format(self._get_readable_size(workspaces_size_total)))

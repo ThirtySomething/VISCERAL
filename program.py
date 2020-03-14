@@ -28,7 +28,7 @@ from visceral.visceral import Visceral
 # Setup logging for dealing with UTF-8, unfortunately not available for basicConfig
 LOGGER_SETUP = logging.getLogger()
 LOGGER_SETUP.setLevel(logging.INFO)
-LOGGER_SETUP.setLevel(logging.DEBUG)
+# LOGGER_SETUP.setLevel(logging.DEBUG)
 LOGGER_HANDLER = logging.FileHandler('program.log', 'w', 'utf-8')
 LOGGER_HANDLER.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)s:%(funcName)s | %(message)s'))
 LOGGER_SETUP.addHandler(LOGGER_HANDLER)
@@ -38,8 +38,7 @@ if __name__ == '__main__':
     logging.debug('startup')
 
     # Initialize program with location of VSCode workspace
-    # Use trick of epanding variables for not to use hardcoded usernames
-    Workspace = Visceral(''.join([os.path.expandvars('${APPDATA}'), '\\Code\\User\\workspaceStorage']))
+    workspace = Visceral()
 
     # Start magic process :D
-    Workspace.execute()
+    workspace.cleanup()
