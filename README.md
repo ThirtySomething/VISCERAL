@@ -1,13 +1,15 @@
 # VISCERAL
+
 **VI**sual **S**tudio **C**od**E** wo**R**ksp**A**ce c**L**eanup
 
 ## Motivation
+
 During the backup of my user profile directory of my Windows machine
 I discovered that this directory has a size of more than 35 GB. This
 was somehow shocking for me. What in heavens sake is wasting so much
-space? Afer some analysis I figured out that the this directory
+space? After some analysis I figured out that the directory
 
-```
+```dos
 C:\Users\Account Name\AppData\Roaming\Code\User\workspaceStorage
 ```
 
@@ -27,11 +29,11 @@ if you want to do so, you have to use the following setting:
 "C_Cpp.default.browse.databaseFilename": "${workspaceFolder}/.vscode/vc.db"
 ```
 
-## Solution
+## My solution
+
 I will use [VSCode] without much special settings. So [VSCode] stores the
-workspace information in the path mentioned above. ~~I've wrote a quick and
-dirty script in Python to do the following~~ I've wrote an extension for
-[VSCode] doing the following:
+workspace information in the path mentioned above. I've wrote an extension
+for [VSCode] to cleanup the ```workspace```:
 
 - Check the ```workspace``` - for each folder found
   - Check if a file named ```workspace.json``` exist in this folder
