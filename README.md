@@ -29,60 +29,18 @@ if you want to do so, you have to use the following setting:
 
 ## Solution
 I will use [VSCode] without much special settings. So [VSCode] stores the
-workspace information in the path mentioned above. I've wrote a quick and
-dirty script in Python to do the following:
+workspace information in the path mentioned above. ~~I've wrote a quick and
+dirty script in Python to do the following~~ I've wrote an extension for
+[VSCode] doing the following:
 
-- A file named ```workspace.json``` does not exist in this folder.
-  - Manual check
-- A file named ```workspace.json``` exists in this folder and
-  - There is no entry ```folder```
-    - Manual check
-  - There is an entry ```folder```
-    - Folder is a network path
-      - Manual check
-    - Folder is a filesystem path
-      - Folder does not exist
-        - Mark workspace to delete
-      - Folder exist
-        - Keep workspace
-        - Memorize folder in keep list
-      - Folder already in keep list
-        - Mark workspace to delete
-
-## Hints
-The current code will perform a dry run. This means that nothing will be deleted.
-In case you really want to delete workspaces, you have to change some code in
-the file ```program.py``` from
-
-```pyton
-# Initialize program with location of VSCode workspace
-workspace = Visceral()
-```
-
-to
-
-```pyton
-# Initialize program with location of VSCode workspace
-workspace = Visceral(False)
-```
-
-The script will log to the file ```program.log``` - in case you want to see
-more information, you have to change in the file ```program.py``` from
-
-```pyton
-# Setup logging for dealing with UTF-8, unfortunately not available for basicConfig
-LOGGER_SETUP = logging.getLogger()
-LOGGER_SETUP.setLevel(logging.INFO)
-# LOGGER_SETUP.setLevel(logging.DEBUG)
-```
-
-to
-
-```pyton
-# Setup logging for dealing with UTF-8, unfortunately not available for basicConfig
-LOGGER_SETUP = logging.getLogger()
-LOGGER_SETUP.setLevel(logging.INFO)
-LOGGER_SETUP.setLevel(logging.DEBUG)
-```
+- Check the ```workspace``` - for each folder found
+  - Check if a file named ```workspace.json``` exist in this folder
+  - If not, skip this workspace
+  - If yes, read the content of ```workspace.json```
+  - Check if a key ```folder``` exist in this file
+  - If not, skip this workspace
+  - If yes, check if folder exists in filesystem
+  - If folder does not exist, mark workspace for deletion
+- Delete all marked folders from ```workspace```
 
 [VSCode]: https://code.visualstudio.com/
