@@ -1,6 +1,6 @@
 {
 	"name": "visceral",
-	"displayName": "Visceral",
+	"displayName": "VISCERAL",
 	"description": "VIsual Studio CodE woRkspAce cLeanup",
 	"version": "0.0.1",
 	"engines": {
@@ -17,7 +17,7 @@
 		"commands": [
 			{
 				"command": "visceral.cleanup",
-				"title": "Visceral: Cleanup"
+				"title": "VISCERAL: Cleanup"
 			}
 		]
 	},
