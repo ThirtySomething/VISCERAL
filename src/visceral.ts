@@ -56,16 +56,14 @@ export class Visceral {
         // If a path is set
         if (this._basePathSet) {
             // Read all workspaces...
-            fs.readdir(this._workspaceBaseDir, (err: any, files: string[]) => {
-                if (err)
-                    console.log(err);
-                else {
-                    // Analyze each workspace
-                    this.determineFoldersToDelete(files);
-                    // Delete all workspaces marked for deletion
-                    result = this.deleteObsoleteWorkspaces();
-                }
+            let folderList = fs.readdirSync(this._workspaceBaseDir, { withFileTypes: true });
+
+            folderList.forEach(fileEntry => {
+                // Analyze each workspace
+                this.determineFoldersToDelete(fileEntry.name);
             });
+            // Delete all workspaces marked for deletion
+            result = this.deleteObsoleteWorkspaces();
         }
         else {
             // No processing possible
@@ -97,25 +95,18 @@ export class Visceral {
     }
 
     // Handle workspaces for analysis
-    private determineFoldersToDelete(files: string[]) {
-        let foldersTotal = 0;
-        let foldersProcessed = 0;
-        // Loop over all workspaces
-        files.forEach(file => {
-            // Build full qualified name to workspace
-            let workspaceFolder = path.join(this._workspaceBaseDir, file);
-            // Perform analysis
-            if (0 == this.processWorkspaceFolder(workspaceFolder)) {
-                // This folder needs manual check
-                console.log(`Check workspace [${workspaceFolder}].`);
-            }
-        });
-        console.log(`Folders total [${foldersTotal}], folders processed [${foldersProcessed}].`);
+    private determineFoldersToDelete(files: string) {
+        let workspaceFolder = path.join(this._workspaceBaseDir, files);
+        // Perform analysis
+        if (!this.processWorkspaceFolder(workspaceFolder)) {
+            // This folder needs manual check
+            console.log(`Check workspace [${workspaceFolder}] manually.`);
+        };
     }
 
     // Analyse workspace folder
-    private processWorkspaceFolder(workspace: string): number {
-        let result = 0;
+    private processWorkspaceFolder(workspace: string): boolean {
+        let result = false;
         let workspaceFile = path.join(workspace, this._WorkspaceFile);
 
         // Abort when workspace does not exist
@@ -134,12 +125,12 @@ export class Visceral {
         }
 
         // Flag workspace file has folder property
-        result++;
+        result = true;
 
-        // Convert to Windows path
-        let foldernameraw = new Url(obj[this._PropertyFolder]);
-        let foldername = decodeURIComponent(foldernameraw['host'] + foldernameraw['pathname']);
+        // Get foldername from object
+        let foldername = this.determineFoldername(obj);
         console.log(`Folder to check [${foldername}]`);
+
         // If folder does not exist
         if (!fs.existsSync(foldername)) {
             console.log(`Folder [${foldername}] does not exist, mark workspace [${workspace}] for delete`);
@@ -148,7 +139,7 @@ export class Visceral {
             return result;
         }
 
-        // Check if folder is already memorizec from another workspace
+        // Check if folder is already memorized from another workspace
         let keepFolder = true;
         for (let i = 0; i < this._PathsChecked.length; i++) {
             if (foldername === this._PathsChecked[i]) {
@@ -183,5 +174,14 @@ export class Visceral {
         }
 
         return obj;
+    }
+
+    // Get foldername as string from object.
+    private determineFoldername(object: Object) {
+        // Convert to Windows path
+        let foldernameraw = new Url(object[this._PropertyFolder]);
+        let foldername = decodeURIComponent(foldernameraw['host'] + foldernameraw['pathname']);
+
+        return foldername;
     }
 }

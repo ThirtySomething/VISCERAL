@@ -1,6 +1,6 @@
 {
 	"name": "visceral",
-	"displayName": "VISCERAL",
+	"displayName": "Visceral",
 	"description": "VIsual Studio CodE woRkspAce cLeanup",
 	"version": "0.0.1",
 	"engines": {
@@ -17,7 +17,7 @@
 		"commands": [
 			{
 				"command": "visceral.cleanup",
-				"title": "VISCERAL: Cleanup"
+				"title": "Visceral: Cleanup"
 			}
 		]
 	},
@@ -30,13 +30,14 @@
 		"test": "node ./out/test/runTest.js"
 	},
 	"devDependencies": {
-		"@types/vscode": "^1.57.0",
 		"@types/glob": "^7.1.3",
 		"@types/mocha": "^8.2.2",
 		"@types/node": "14.x",
-		"eslint": "^7.27.0",
+		"@types/url-parse": "^1.4.3",
+		"@types/vscode": "^1.57.0",
 		"@typescript-eslint/eslint-plugin": "^4.26.0",
 		"@typescript-eslint/parser": "^4.26.0",
+		"eslint": "^7.27.0",
 		"glob": "^7.1.7",
 		"mocha": "^8.4.0",
 		"typescript": "^4.3.2",
