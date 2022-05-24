@@ -1,47 +1,42 @@
-import * as path from 'path';
 import fs = require('fs');
+import * as path from 'path';
 import Url = require('url-parse');
-var fsUtils = require("nodejs-fs-utils");
+var fsUtils = require('nodejs-fs-utils');
+import { VisceralWorkspace } from './visceralworkspace';
+import { VisceralConfig } from './visceralconfig';
 
 /*
 ********************************************************************************
-* Visceral - A Visual Studio Code extension
+* Visceral - VIsual Studio CodE woRkspAce cLeanup
 ********************************************************************************
+* Notes:
+* https://andculture.com/blog/writing-and-publishing-your-first-visual-studio-code-extension/
 */
 export class Visceral {
     // The location on windows
-    private _WinWorkspacePath = '\\Code\\User\\workspaceStorage';
-    // The file created by VSCode in a workspace
-    private _WorkspaceFile = 'workspace.json';
-    // The key inside of a workspace file to check
-    private _PropertyFolder = 'folder';
+    private _WinWorkspacePath: string = '\\Code\\User\\workspaceStorage';
     // Will be the full path to the VSCode workspace
     private _workspaceBaseDir: string = '';
-    // Flag that a path is set
-    private _basePathSet: boolean = false;
-    // Array to memorize already checked paths (not workspaces!)
-    private _PathsChecked: string[];
-    // Array of workspaces to delete
-    private _PathsToDelete: string[];
+    // Settings object
+    private _settings: VisceralConfig;
 
     // Default constructor
-    constructor() {
-        // Initialize arrays
-        this._PathsChecked = [];
-        this._PathsToDelete = [];
-        // Get platform from VSCode - extension worsk only on Windows at the moment
-        if (process.platform === "win32") {
-            this._setWorkspaceBaseDirWindows();
-        }
-        else {
-            console.log(`Running not on windows, don't know the location workspace folder.`);
+    constructor(settings: VisceralConfig) {
+        this._settings = settings;
+        // Get platform from VSCode - extension works only on Windows at the moment
+        switch (process.platform) {
+            case "win32":
+                this._setWorkspaceBaseDirWindows();
+                break;
+            default:
+                console.log(`Running not on windows, don't know the location of workspace folder.`);
+                break;
         }
     }
 
     // Determine full path to workspaces on windows
     private _setWorkspaceBaseDirWindows() {
         this._workspaceBaseDir = path.join(String(process.env['APPDATA']), this._WinWorkspacePath);
-        this._basePathSet = true;
         console.log(`Running on Windows, workspaceBaseDir is [${this._workspaceBaseDir}]`);
     }
 
@@ -50,20 +45,40 @@ export class Visceral {
         // Init message for user feedback
         let result = '';
         // Init arrays again - user might call more than once
-        this._PathsChecked = [];
-        this._PathsToDelete = [];
+        let workspaceList: VisceralWorkspace[] = [];
 
         // If a path is set
-        if (this._basePathSet) {
+        if (this._workspaceBaseDir.length > 0) {
             // Read all workspaces...
             let folderList = fs.readdirSync(this._workspaceBaseDir, { withFileTypes: true });
 
+            // Build list of workspace objects
             folderList.forEach(fileEntry => {
-                // Analyze each workspace
-                this.determineFoldersToDelete(fileEntry.name);
+                // Workspace will marked for deletion
+                // - workspace.json does not exist in workspace
+                // - workspace.json does not contain folder entry
+                // - code folder does not exist
+                this.extendWorkspaceList(workspaceList, fileEntry.name);
             });
-            // Delete all workspaces marked for deletion
-            result = this.deleteObsoleteWorkspaces();
+
+            // Mark child workspaces for deletion if configured
+            if (!this._settings.keepchilds) {
+                this.markChildFolders(workspaceList);
+            }
+
+            // Remove all workspaces marked for deletion
+            result = this.deleteObsoleteWorkspaces(workspaceList);
+
+            // Extend info about keep childs
+            if (this._settings.keepchilds) {
+                result = '[Keep childs] ' + result;
+            }
+
+            // Extend info about dry run
+            if (this._settings.dryrun) {
+                result = 'Dry run: ' + result;
+            }
+
         }
         else {
             // No processing possible
@@ -74,114 +89,69 @@ export class Visceral {
         return result;
     }
 
-    // Handle folders marked to delete
-    private deleteObsoleteWorkspaces(): string {
+    // Delete all workspaces marked for deletion
+    private deleteObsoleteWorkspaces(workspaces: VisceralWorkspace[]): string {
         // Total free size
         let sizeTotalBytes = 0;
+        let countDeleted = 0;
+
         // Loop over all marked folders
-        for (let i = 0; i < this._PathsToDelete.length; i++) {
-            console.log(`Deleting workspace [${this._PathsToDelete[i]}].`);
+        for (let i = 0; i < workspaces.length; i++) {
+            if (false == workspaces[i].getDeleteFolder()) {
+                continue;
+            }
+            let workspace = workspaces[i].getWorkspaceFolder();
             // Determine folder size in bytes
-            let bytes = fsUtils.fsizeSync(this._PathsToDelete[i]);
+            let bytes = fsUtils.fsizeSync(workspace);
             // Update total size
             sizeTotalBytes += bytes;
-            // No deletion at the moment
-            // fsUtils.rmdirsSync(this._PathsToDelete[i]);
+            // No deletion if dry run is active
+            if (!this._settings.dryrun) {
+                console.log(`Delete workspace [${workspace}].`);
+                fsUtils.rmdirsSync(workspace);
+            } else {
+                console.log(`Dry run on workspace [${workspace}].`);
+            }
+            countDeleted++;
         }
         // Return message
-        let result = `Deleted [${this._PathsToDelete.length}] workspaces and freed [${sizeTotalBytes}] bytes.`;
+        let result = `Deleted [${countDeleted}] workspaces and freed [${sizeTotalBytes}] bytes.`;
         console.log(result);
         return result;
     }
 
-    // Handle workspaces for analysis
-    private determineFoldersToDelete(files: string) {
-        let workspaceFolder = path.join(this._workspaceBaseDir, files);
-        // Perform analysis
-        if (!this.processWorkspaceFolder(workspaceFolder)) {
-            // This folder needs manual check
-            console.log(`Check workspace [${workspaceFolder}] manually.`);
-        };
-    }
-
-    // Analyse workspace folder
-    private processWorkspaceFolder(workspace: string): boolean {
-        let result = false;
-        let workspaceFile = path.join(workspace, this._WorkspaceFile);
-
-        // Abort when workspace does not exist
-        console.log(`Analyzing workspace [${workspace}]`);
-        if (!fs.existsSync(workspace)) {
-            console.log(`Workspace [${workspaceFile}] does not exist`);
-            return result;
+    // Mark all workspaced for deletion where a parent codepath exists
+    private markChildFolders(workspacelist: VisceralWorkspace[]) {
+        // Need at least two elements to work on
+        if (2 > workspacelist.length) {
+            console.log(`Too few elements [${workspacelist.length}].`);
+            return;
         }
-
-        // Abort in case property `folder` is not available in workspace file
-        console.log(`Read content of workspace file [${workspaceFile}]`);
-        let obj = this.readFileContent(workspaceFile);
-        if (!obj.hasOwnProperty(this._PropertyFolder)) {
-            console.log(`File [${workspaceFile}] does not contain key [${this._PropertyFolder}]`);
-            return result;
-        }
-
-        // Flag workspace file has folder property
-        result = true;
-
-        // Get foldername from object
-        let foldername = this.determineFoldername(obj);
-        console.log(`Folder to check [${foldername}]`);
-
-        // If folder does not exist
-        if (!fs.existsSync(foldername)) {
-            console.log(`Folder [${foldername}] does not exist, mark workspace [${workspace}] for delete`);
-            // Mark workspace for deletion
-            this._PathsToDelete.push(workspace);
-            return result;
-        }
-
-        // Check if folder is already memorized from another workspace
-        let keepFolder = true;
-        for (let i = 0; i < this._PathsChecked.length; i++) {
-            if (foldername === this._PathsChecked[i]) {
-                console.log(`Folder [${foldername}] already processed`);
-                keepFolder = false;
-                break;
+        for (let outer = 1; outer <= (workspacelist.length - 2); outer++) {
+            let wsOuter = workspacelist[outer];
+            if (wsOuter.getDeleteFolder()) {
+                // console.log(`Outer workspace [${JSON.stringify(wsOuter)}]`);
+                continue;
+            }
+            for (let inner = (outer + 1); inner < (workspacelist.length - 1); inner++) {
+                let wsInner = workspacelist[inner];
+                if (wsInner.getDeleteFolder()) {
+                    // console.log(`Inner workspace [${JSON.stringify(wsInner)}]`);
+                    continue;
+                }
+                if (wsInner.getCodeFolder().includes(wsOuter.getCodeFolder())) {
+                    console.log(`Folder [${wsInner.getCodeFolder()}] is child folder of [${wsOuter.getCodeFolder()}], marked for delete.`);
+                    wsInner.setDeleteFolder(true);
+                }
             }
         }
-
-        if (keepFolder === true) {
-            // Memorize folder
-            this._PathsChecked.push(foldername);
-        } else {
-            // Folder already memorized, mark workspace for deletion
-            console.log(`Folder [${foldername}] is duplicated, mark workspace [${workspace}] for delete`);
-            this._PathsToDelete.push(workspace);
-            return result;
-        }
-
-        return result;
     }
 
-    // Read content of workspace file
-    private readFileContent(filename: string): Object {
-        let obj = {};
-
-        try {
-            let content = fs.readFileSync(filename, 'utf8');
-            obj = JSON.parse(content);
-        } catch (err) {
-            console.error(err);
-        }
-
-        return obj;
-    }
-
-    // Get foldername as string from object.
-    private determineFoldername(object: Object) {
-        // Convert to Windows path
-        let foldernameraw = new Url(object[this._PropertyFolder]);
-        let foldername = decodeURIComponent(foldernameraw['host'] + foldernameraw['pathname']);
-
-        return foldername;
+    // Extract folder names and add to list
+    private extendWorkspaceList(workspaceList: VisceralWorkspace[], foldername: string) {
+        let workspaceFolder = path.join(this._workspaceBaseDir, foldername);
+        let workspaceObj = new VisceralWorkspace(workspaceFolder);
+        workspaceObj.extendData();
+        workspaceList.push(workspaceObj);
     }
 }

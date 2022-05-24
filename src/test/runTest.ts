@@ -2,6 +2,8 @@ import * as path from 'path';
 
 import { runTests } from 'vscode-test';
 
+// https://www.richardkotze.com/coding/unit-test-mock-vs-code-extension-api-jest
+
 async function main() {
 	try {
 		// The folder containing the Extension Manifest package.json
