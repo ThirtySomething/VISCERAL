@@ -9,8 +9,6 @@ import { VisceralConfig } from './visceralconfig';
 ********************************************************************************
 * Visceral - VIsual Studio CodE woRkspAce cLeanup
 ********************************************************************************
-* Notes:
-* https://andculture.com/blog/writing-and-publishing-your-first-visual-studio-code-extension/
 */
 export class Visceral {
     // The location on windows
@@ -29,12 +27,12 @@ export class Visceral {
                 this._setWorkspaceBaseDirWindows();
                 break;
             default:
-                console.log(`Running not on windows, don't know the location of workspace folder.`);
+                console.log(`Running not on Windows, don't know the location of workspace folder.`);
                 break;
         }
     }
 
-    // Determine full path to workspaces on windows
+    // Determine full path to workspaces on Windows
     private _setWorkspaceBaseDirWindows() {
         this._workspaceBaseDir = path.join(String(process.env['APPDATA']), this._WinWorkspacePath);
         console.log(`Running on Windows, workspaceBaseDir is [${this._workspaceBaseDir}]`);
@@ -54,7 +52,7 @@ export class Visceral {
 
             // Build list of workspace objects
             folderList.forEach(fileEntry => {
-                // Workspace will marked for deletion
+                // Workspace will marked for deletion when
                 // - workspace.json does not exist in workspace
                 // - workspace.json does not contain folder entry
                 // - code folder does not exist
@@ -97,10 +95,10 @@ export class Visceral {
 
         // Loop over all marked folders
         for (let i = 0; i < workspaces.length; i++) {
-            if (false == workspaces[i].getDeleteFolder()) {
+            if (false == workspaces[i].getDeleteFolderFlag()) {
                 continue;
             }
-            let workspace = workspaces[i].getWorkspaceFolder();
+            let workspace = workspaces[i].getWorkspaceFolderString();
             // Determine folder size in bytes
             let bytes = fsUtils.fsizeSync(workspace);
             // Update total size
@@ -129,19 +127,19 @@ export class Visceral {
         }
         for (let outer = 1; outer <= (workspacelist.length - 2); outer++) {
             let wsOuter = workspacelist[outer];
-            if (wsOuter.getDeleteFolder()) {
+            if (wsOuter.getDeleteFolderFlag()) {
                 // console.log(`Outer workspace [${JSON.stringify(wsOuter)}]`);
                 continue;
             }
             for (let inner = (outer + 1); inner < (workspacelist.length - 1); inner++) {
                 let wsInner = workspacelist[inner];
-                if (wsInner.getDeleteFolder()) {
+                if (wsInner.getDeleteFolderFlag()) {
                     // console.log(`Inner workspace [${JSON.stringify(wsInner)}]`);
                     continue;
                 }
-                if (wsInner.getCodeFolder().includes(wsOuter.getCodeFolder())) {
-                    console.log(`Folder [${wsInner.getCodeFolder()}] is child folder of [${wsOuter.getCodeFolder()}], marked for delete.`);
-                    wsInner.setDeleteFolder(true);
+                if (wsInner.getCodeFolderString().includes(wsOuter.getCodeFolderString())) {
+                    console.log(`Folder [${wsInner.getCodeFolderString()}] is child folder of [${wsOuter.getCodeFolderString()}], marked for delete.`);
+                    wsInner.setDeleteFolderFlag(true);
                 }
             }
         }

@@ -21,51 +21,61 @@ export class VisceralWorkspace {
     }
 
     // Get deletion flag
-    public getDeleteFolder(): boolean {
+    public getDeleteFolderFlag(): boolean {
         return this._deleteFolder;
     }
 
     // Set deletion flag
-    public setDeleteFolder(value: boolean) {
+    public setDeleteFolderFlag(value: boolean) {
         this._deleteFolder = value;
     }
 
     // Gain access to the code folder
-    public getCodeFolder(): string {
+    public getCodeFolderString(): string {
         return this._codeFolder;
     }
 
     // Gain access to the workspace folder
-    public getWorkspaceFolder(): string {
+    public getWorkspaceFolderString(): string {
         return this._workspaceFolder;
     }
 
     // Extend internal data for processing
     public extendData() {
-        this.setDeleteFolder(this.handleFileExistence(this._workspaceFolder, VisceralWorkspace._WorkspaceFile));
-        if (!this.getDeleteFolder()) {
+        // Set delete folder flag depending on existence of workspace or not
+        this.setDeleteFolderFlag(this.checkFileExistence(this._workspaceFolder, VisceralWorkspace._WorkspaceFile));
+        if (!this.getDeleteFolderFlag()) {
+            // Figure out the name of the code folder
             this._codeFolder = this.determineCodeFolder(this._workspaceFolder, VisceralWorkspace._WorkspaceFile);
             if (this._codeFolder.length == 0) {
+                // Code folder not set
                 console.log(`Folderlength is zero, mark workspace for deletion.`);
-                this.setDeleteFolder(true);
+                this.setDeleteFolderFlag(true);
             } else {
-                this.setDeleteFolder(!this.fileExist(this._codeFolder));
+                // Set delete folder flag depending on existence of code folder
+                this.setDeleteFolderFlag(!this.fileExist(this._codeFolder));
             }
         }
     }
 
     // Check existence of file
     private fileExist(fname: string): boolean {
-        let exists = true;
-        if (!fs.existsSync(fname)) {
+        // Assume file/folder does not exist
+        let exists = false;
+        if (fs.existsSync(fname)) {
+            // File/folder exists, update flag
+            exists = true;
+        }
+        else {
+            // File/folder does not exist, set message
             console.log(`[${fname}] not found`);
-            exists = false;
         }
         return exists;
     }
 
     // Check for existing file in folder
-    private handleFileExistence(workspaceFolder: string, workspaceFile: string): boolean {
+    private checkFileExistence(workspaceFolder: string, workspaceFile: string): boolean {
+        // Assume no deletion
         let deleteMe = false;
         let file2Check = path.join(workspaceFolder, workspaceFile);
 
@@ -81,10 +91,11 @@ export class VisceralWorkspace {
         let codeFolder = "";
         let file2Check = path.join(workspaceFolder, workspaceFile);
 
+        // No check for existence because its previously done
         let obj = this.readFileContent(file2Check);
         if (obj.hasOwnProperty(VisceralWorkspace._PropertyFolder)) {
             codeFolder = this.determineFoldername(obj);
-            console.log(`Determine codeFolder [${codeFolder}] for workspace [${file2Check}]`);
+            console.log(`Determined codeFolder [${codeFolder}] for workspace [${file2Check}]`);
         } else {
             console.log(`File [${file2Check}] does not contain key [${VisceralWorkspace._PropertyFolder}]`);
         }
