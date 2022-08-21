@@ -43,7 +43,7 @@ export class VisceralWorkspace {
     // Extend internal data for processing
     public extendData() {
         // Set delete folder flag depending on existence of workspace or not
-        this.setDeleteFolderFlag(this.checkFileExistence(this._workspaceFolder, VisceralWorkspace._WorkspaceFile));
+        this.setDeleteFolderFlag(this.isWorkspaceDeletable(this._workspaceFolder, VisceralWorkspace._WorkspaceFile));
         if (!this.getDeleteFolderFlag()) {
             // Figure out the name of the code folder
             this._codeFolder = this.determineCodeFolder(this._workspaceFolder, VisceralWorkspace._WorkspaceFile);
@@ -74,12 +74,14 @@ export class VisceralWorkspace {
     }
 
     // Check for existing file in folder
-    private checkFileExistence(workspaceFolder: string, workspaceFile: string): boolean {
+    private isWorkspaceDeletable(workspaceFolder: string, workspaceFile: string): boolean {
         // Assume no deletion
         let deleteMe = false;
         let file2Check = path.join(workspaceFolder, workspaceFile);
 
+        // If workspace contains no workspace.json file
         if (!this.fileExist(file2Check)) {
+            // Delete workspace
             console.log(`Mark workspace [${workspaceFolder}] for deletion`);
             deleteMe = true;
         }
@@ -88,15 +90,18 @@ export class VisceralWorkspace {
 
     // Read key VCWorkspace._PropertyFolder from JSON object
     private determineCodeFolder(workspaceFolder: string, workspaceFile: string): string {
+        // No codefolder by default (length is equal to zero)
         let codeFolder = "";
         let file2Check = path.join(workspaceFolder, workspaceFile);
 
         // No check for existence because its previously done
         let obj = this.readFileContent(file2Check);
         if (obj.hasOwnProperty(VisceralWorkspace._PropertyFolder)) {
+            // Read property value
             codeFolder = this.determineFoldername(obj);
             console.log(`Determined codeFolder [${codeFolder}] for workspace [${file2Check}]`);
         } else {
+            // Property not available
             console.log(`File [${file2Check}] does not contain key [${VisceralWorkspace._PropertyFolder}]`);
         }
 
@@ -108,10 +113,12 @@ export class VisceralWorkspace {
         let obj = {};
 
         try {
-            // console.log(`Read content of workspace file [${filename}]`);
+            // Read content into temporary variable
             let content = fs.readFileSync(filename, 'utf8');
+            // Create JSON object from content
             obj = JSON.parse(content);
         } catch (err) {
+            // Outch, printout error
             console.error(err);
         }
 
@@ -124,6 +131,8 @@ export class VisceralWorkspace {
         let foldername: string = '';
         let foldernameraw = new Url(object[VisceralWorkspace._PropertyFolder as keyof object]);
 
+        // Complicated way to retrieve code folder name from JSOM object
+        // How this is done in VSCode?
         if (foldernameraw['host'].length == 0) {
             if (foldernameraw['pathname'].startsWith('/')) {
                 foldername = decodeURIComponent(foldernameraw['pathname'].substring(1));
